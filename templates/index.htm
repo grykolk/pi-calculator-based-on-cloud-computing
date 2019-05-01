@@ -1,0 +1,44 @@
+{% extends "_base.htm" %}
+
+{% block title %}
+	Page 1
+{% endblock %}
+
+{% block pageblock %}
+
+	<div id="up">
+		<h1>I am a student from University of Surrey. <br/><br/></h1>
+	</div>
+	
+	<div id="down">
+		<h3>please input the parameter :&nbsp;</h3>
+		<form id="stats" method="post" action="/calculate">
+			<h4>select calculator mode:<select name="mode"> 
+				<option value="0">given number</option> 
+				<option value="1">given accuracy </option> 
+			</select></h4>
+			<h4>Total shots: <input type="text" name="total_shots" value="100000" /><br/></h4>
+			<h4>accuracy: <input type="text" name="accuracy" /><br/></h4>
+			<h4>resources: <input type="text" name="R" value="2"/><br/></h4>
+			<h4>report rate: <input type="text" name="Q" value="10"/><br/></h4>
+			<h4>select server to run:<select name="server"> 
+				<option value="0">AWS LAMBDA</option> 
+				<option value="1">AWS EMR</option> 
+			</select></h4>
+			<h4><!--<input type="submit" name="draw" value="Draw Chart" />-->
+				<input type="submit" name="draw" value="run" />
+			<input type="submit" name='cancel' value="Cancel"
+			onclick="window.location='/'; return false;" /><br/></h4>
+		</form>
+		
+		{% if note %}
+		<h3 style="color: #11FFFF">
+			{{ note }}
+		</h3>
+		{% endif %}
+	
+	</div>
+
+{% endblock %}
+
+

@@ -1,0 +1,23 @@
+{% extends "_base.htm" %}
+
+{% block title %}
+	Page 1
+{% endblock %}
+
+{% block pageblock %}
+
+	<div id="up" style="text-align: right;">
+		<h3><a href="index.htm">back to first page</a><br/></h3>
+	</div>
+
+
+	<div id="up">
+		<h2>All classmates in my course: <br/><br/></h2>
+		<img src="http://chart.apis.google.com/chart?cht=p3&chd=t:{{ data }}&chs=250x100&chl=Male|Female"
+		classed="displayed" alt="Graph: no internet connection." align="center" /><br/><br/>
+		
+	</div>
+
+{% endblock %}
+
+
