@@ -4,6 +4,9 @@ import webapp2
 import jinja2
 import httplib
 import json
+import Queue
+import threading
+
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_environment = jinja2.Environment( loader = jinja2.FileSystemLoader(template_dir), autoescape=True)
 	
@@ -20,7 +23,25 @@ def doRender(handler, tname, values={}):
 	template = jinja_environment.get_template(tname)
 	handler.response.out.write(template.render(newval))
 	return True
-
+def lambda_call(shots,Q,queue):
+    c = httplib.HTTPSConnection("b5e5hz094g.execute-api.eu-west-2.amazonaws.com")
+    json_send= '{ "shots_each_threat": "'+str(shots)+'","Q": "'+str(Q)+'"}'
+    c.request("POST", "/default", json_send)
+    response = c.getresponse()
+    queue.put(json.loads(response.read()))
+def multithreading_lambda_call(shots,Q,thread_count):
+    queue=Queue.Queue()
+    threads=[]
+    for i in range(thread_count):
+        t=threading.Thread(target=lambda_call,args=(shots,Q,queue))
+        t.start()
+        threads.append(t)
+    for thread in threads:
+        thread.join()
+    results=[]
+    for i in range(thread_count):
+        results[thread_count*Q:(thread_count*Q)+Q]=queue.get()
+    return results
 class CalculateHandler(webapp2.RequestHandler):
 	def post(self):
 		try:
@@ -39,13 +60,7 @@ class CalculateHandler(webapp2.RequestHandler):
 		
 		else:
 			shotsForEachBlock=shots//(Q*R)
-			#threat loop
-			c = httplib.HTTPSConnection("b5e5hz094g.execute-api.eu-west-2.amazonaws.com")
-			json= '{ "shots_each_threat": "'+str(shots)+'","Q": "'+str(Q)+'"}'
-			c.request("POST", "/default", json)
-			response = c.getresponse()
-			data = response.read()
-			PYdata=json.loads(data)
+			PYdata=multithreading_lambda_call(shotsForEachBlock,Q,R)
 			for i in range(1,len(PYdata)):
 				PYdata[i]+=PYdata[i-1]
 				PYdata[i-1]/=shotsForEachBlock*(i)
