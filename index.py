@@ -3,7 +3,7 @@ import os
 import webapp2
 import jinja2
 import httplib
-
+import json
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_environment = jinja2.Environment( loader = jinja2.FileSystemLoader(template_dir), autoescape=True)
 	
@@ -45,6 +45,12 @@ class CalculateHandler(webapp2.RequestHandler):
 			c.request("POST", "/default", json)
 			response = c.getresponse()
 			data = response.read()
+			PYdata=json.loads(data)
+			for i in range(1,len(PYdata)):
+				PYdata[i]+=PYdata[i-1]
+				PYdata[i-1]/=shotsForEachBlock*(i)
+			PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)
+			data=json.dumps(PYdata)
 			doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock})
 			#doRender(self,'index.htm',{'note':data})#demo test line
 			#doRender(self,'chart.htm',
