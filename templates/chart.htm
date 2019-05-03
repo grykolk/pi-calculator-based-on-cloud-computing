@@ -18,19 +18,16 @@
 		<script type="text/javascript">
 		google.charts.load('current', {packages: ['corechart', 'line']});
 		google.charts.setOnLoadCallback(drawLineColors);
-
 		function drawLineColors() {
 			var data = new google.visualization.DataTable();
 			data.addColumn('number', 'X');
 			data.addColumn('number', 'MC-pi');
 			data.addColumn('number', 'real-pi');
-
-			data.addRows([
-				[0, 0, 3.1415]
-			]);
-					data.addRows([
-				[10, 3, 3.1415], 
-			]);
+			console.log();
+			for(var i=1;i<{{Data}}.length;i++){
+			data.addRows([[{{shots_each_threat}}*i, {{Data}}[i], 3.1415]]);
+			}
+			
 			var options = {
 				hAxis: {
 				title: 'runTimes'

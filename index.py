@@ -38,13 +38,15 @@ class CalculateHandler(webapp2.RequestHandler):
 			accuracy = int(self.request.get('accuracy'))
 		
 		else:
+			shotsForEachBlock=shots//(Q*R)
 			#threat loop
-			c = httplib.HTTPSConnection("pzczyyy55.execute-api.eu-west-2.amazonaws.com")
+			c = httplib.HTTPSConnection("b5e5hz094g.execute-api.eu-west-2.amazonaws.com")
 			json= '{ "shots_each_threat": "'+str(shots)+'","Q": "'+str(Q)+'"}'
 			c.request("POST", "/default", json)
 			response = c.getresponse()
 			data = response.read()
-			doRender(self,'index.htm',{'note':data})#demo test line
+			doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock})
+			#doRender(self,'index.htm',{'note':data})#demo test line
 			#doRender(self,'chart.htm',
 			#{'data': str(mP) + ',' + str(fP)})
 
