@@ -1,4 +1,4 @@
-application: myappidentifier-ex1
+application: green-jet-230716
 version: 1
 runtime: python27 # needed to set up the correct runtime environment
 api_version: 1
@@ -14,4 +14,8 @@ handlers:
 libraries:
 - name: jinja2
   version: latest
+- name: numpy
+  version: 1.6.1
+- name: ssl
+  version: 2.7.11
 

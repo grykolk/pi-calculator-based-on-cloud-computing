@@ -13,6 +13,7 @@
 
 	<div id="up">
 		<h2>the plot of pi change<br/><br/></h2>
+		<h2>parameters: shots={{shots}}, resources={{R}},report rate={{Q}},final pi value={{result}}
 		<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 		<div id="chart_div"></div>
 		<script type="text/javascript">
@@ -24,8 +25,8 @@
 			data.addColumn('number', 'MC-pi');
 			data.addColumn('number', 'real-pi');
 			console.log();
-			for(var i=1;i<{{Data}}.length;i++){
-			data.addRows([[{{shots_each_threat}}*i, {{Data}}[i], 3.1415]]);
+			for(var i=0;i<{{Data}}.length;i++){
+				data.addRows([[{{shots_each_threat}}*(i+1), {{Data}}[i], {{pi}}]]);
 			}
 			
 			var options = {

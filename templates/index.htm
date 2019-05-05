@@ -25,12 +25,15 @@
 				<option value="0">AWS LAMBDA</option> 
 				<option value="1">AWS EMR</option> 
 			</select></h4>
-			<h4><!--<input type="submit" name="draw" value="Draw Chart" />-->
+			<h4>
 				<input type="submit" name="draw" value="run" />
-			<input type="submit" name='cancel' value="Cancel"
-			onclick="window.location='/'; return false;" /><br/></h4>
+			</h4>
 		</form>
-		
+		<form id="stats" method="post" action="/s3">
+		<h4>
+				<input type="submit" name="draw" value="show last run" />
+		</h4>
+		</form>
 		{% if note %}
 		<h3 style="color: #11FFFF">
 			{{ note }}
