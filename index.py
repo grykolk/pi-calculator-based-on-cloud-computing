@@ -44,16 +44,19 @@ def multithreading_lambda_call(shots,Q,thread_count):
         thread.join()
     results=[]
     for i in range(thread_count):
-        results[thread_count*Q:(thread_count*Q)+Q]=queue.get()
+        results[i*Q:(i*Q)+Q]=queue.get()
     return results
 class S3Handler(webapp2.RequestHandler):
     def post(self):
         s3_connection=S3Connection('AKIAI7AQSIAKUCHT2IWA','sVOEy7qRNZ18Ef138lIRCsQCyzcRRlxE/1OD0GYl')
-        bucket=s3_connection.get_bucket('temp0331')
+        bucket=s3_connection.get_bucket('bucket774')
         k=Key(bucket)
         k.key='record.json'
-        k.set_contents_from_string('[160,156]')
-        doRender(self,'index.htm',{'note':bucketnames})
+        data=k.get_contents_as_string()
+        k.key='record_para.json'
+        data_para_json=k.get_contents_as_string()
+        data_para=json.loads(data_para_json)
+        doRender(self,'chart.htm',{'Data':data,'shots_each_threat':data_para[0],'R':data_para[1],'Q':data_para[2],'pi':math.pi,'shots':data_para[3],'result':data_para[4]})
 class CalculateHandler(webapp2.RequestHandler):
 	def post(self):
 		try:
@@ -86,7 +89,7 @@ class CalculateHandler(webapp2.RequestHandler):
 				PYdata[i-1]/=shotsForEachBlock*(i)*runtimes
 			PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)*runtimes
 			data=json.dumps(PYdata.tolist())#covernt numpy array to list
-                        doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots*runtimes,'result':PYdata[len(PYdata)-1]})
+                        
 		
 		else:
 
@@ -96,7 +99,16 @@ class CalculateHandler(webapp2.RequestHandler):
 				PYdata[i-1]/=shotsForEachBlock*(i)
 			PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)
 			data=json.dumps(PYdata)
-    			doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
+    		s3_connection=S3Connection('AKIAI7AQSIAKUCHT2IWA','sVOEy7qRNZ18Ef138lIRCsQCyzcRRlxE/1OD0GYl')
+                bucket=s3_connection.get_bucket('bucket774')
+                k=Key(bucket)
+                k.key='record.json'
+                k.set_contents_from_string(data)
+                k.key='record_para.json'
+                parameter='['+str(shotsForEachBlock)+','+str(R)+','+str(Q)+','+str(shots)+','+str(PYdata[len(PYdata)-1])+']'
+                #record_para=json.loads(parameter)
+                k.set_contents_from_string(parameter)
+                doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
 
 
 
