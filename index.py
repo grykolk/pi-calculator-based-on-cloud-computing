@@ -11,6 +11,11 @@ import numpy as np
 import boto
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
+import boto.emr
+from boto.emr.connection import EmrConnection
+from boto.emr.step import StreamingStep
+from boto.emr.instance_group import InstanceGroup
+
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_environment = jinja2.Environment( loader = jinja2.FileSystemLoader(template_dir), autoescape=True)
 	
@@ -92,6 +97,7 @@ class CalculateHandler(webapp2.RequestHandler):
                         
 		
 		else:
+                    if server==0:
 
 			PYdata =multithreading_lambda_call(shotsForEachThread,Q,R)
 			for i in range(1,len(PYdata)):
@@ -99,6 +105,32 @@ class CalculateHandler(webapp2.RequestHandler):
 				PYdata[i-1]/=shotsForEachBlock*(i)
 			PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)
 			data=json.dumps(PYdata)
+                    else:
+                        emr_input=''
+                        for i in range(R*Q):
+                            emr_input+=str(shotsForEachBlock)
+                            emr_input+='\n'
+
+                        s3_connection=S3Connection('AKIAI7AQSIAKUCHT2IWA','sVOEy7qRNZ18Ef138lIRCsQCyzcRRlxE/1OD0GYl')
+                        bucket=s3_connection.get_bucket('bucket774')
+                        for key in bucket.list(prefix='output/'):
+                            key.delete()
+                        k=Key(bucket)
+                        k.key='input/0001'
+                        k.set_contents_from_string(emr_input)
+                        step=StreamingStep(name='MC_Method example',mapper='s3://bucket774/map.py',reducer='s3://',input='s3://input/',output='s3://output/')
+                        #emr_conn=boto.emr.connect_to_region(region_name='eu-west-2',aws_access_key_id='AKIAI7AQSIAKUCHT2IWA',aws_secret_access_key='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',)
+                        emr_conn=EmrConnection('AKIAI7AQSIAKUCHT2IWA','sVOEy7qRNZ18Ef138lIRCsQCyzcRRlxE/1OD0GYl')
+                        instance_groups=[]
+                        instance_groups.append(InstanceGroup(num_instances=1,role="MASTER",type='m4.large',market="ON_DEMAND",name="Master nodes"))
+                        if R>1:
+                            instance_groups.append(InstanceGroup(num_instances=R-1,role="CORE",type='m4.large',market="ON_DEMAND",name="Slave nodes"))
+                        cluster_id=emr_conn.run_jobflow(name='test MC_method run',availability_zone='eu-west-2b',instance_groups=instance_groups,enable_debugging=False,steps=[step], visible_to_all_users=True, keep_alive=False, job_flow_role="EMR_EC2_DefaultRole",service_role="EMR_EC2_DefaultRole",hadoop_version='2.4.0')
+
+
+
+
+
     		s3_connection=S3Connection('AKIAI7AQSIAKUCHT2IWA','sVOEy7qRNZ18Ef138lIRCsQCyzcRRlxE/1OD0GYl')
                 bucket=s3_connection.get_bucket('bucket774')
                 k=Key(bucket)
