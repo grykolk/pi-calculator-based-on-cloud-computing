@@ -18,9 +18,7 @@ from boto.emr.instance_group import InstanceGroup
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_environment = jinja2.Environment( loader = jinja2.FileSystemLoader(template_dir), autoescape=True)
-access_id=''
-access_key=''
-	
+
 def doRender(handler, tname, values={}):
 	temp = os.path.join(os.path.dirname(__file__), 'templates/'+tname)
 	if not os.path.isfile(temp):
@@ -108,22 +106,116 @@ def get_output():
 def in_circle_to_pi(PYdata,shotsForEachBlock):
     for i in range(1,len(PYdata)):
         PYdata[i]+=PYdata[i-1]
-	PYdata[i-1]/=shotsForEachBlock*(i)
-    PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)
+	PYdata[i-1]/=float(shotsForEachBlock*(i))
+    PYdata[len(PYdata)-1]/=float(shotsForEachBlock*len(PYdata))
     return json.dumps(PYdata)
     
-
+def store_parameter(shots_each_block,R,Q,shots,accuracy,runtime,emr_jobflow_working,emr_job_mode):
+    s3_connection=S3Connection(access_id,access_key)
+    bucket=s3_connection.get_bucket('bucket774')
+    k=Key(bucket)
+    k.key='temp_para.json'
+    k.set_contents_from_string(json.dumps([shots_each_block,R,Q,shots,accuracy,runtime,emr_jobflow_working,emr_job_mode]))
+def save_temp_result(PYdata):
+    s3_connection=S3Connection(access_id,access_key)
+    bucket=s3_connection.get_bucket('bucket774')
+    k=Key(bucket)
+    k.key='temp_data.json'
+    k.set_contents_from_string(json.dumps(PYdata.tolist()))
+def save_cluster_id(cluster_id):
+    s3_connection=S3Connection(access_id,access_key)
+    bucket=s3_connection.get_bucket('bucket774')
+    k=Key(bucket)
+    k.key='cluster_id'
+    k.set_contents_from_string(cluster_id)
 class S3Handler(webapp2.RequestHandler):
     def post(self):
+        if not boto.config.has_section('Boto'):
+            boto.config.add_section('Boto')
+        boto.config.set('Boto','https_validate_certificates','False')
+        note=''
+        data_para=[0,0,0,0,0]
         s3_connection=S3Connection(access_id,access_key)
         bucket=s3_connection.get_bucket('bucket774')
         k=Key(bucket)
-        k.key='record.json'
-        data=k.get_contents_as_string()
-        k.key='record_para.json'
-        data_para_json=k.get_contents_as_string()
-        data_para=json.loads(data_para_json)
-        doRender(self,'chart.htm',{'Data':data,'shots_each_threat':data_para[0],'R':data_para[1],'Q':data_para[2],'pi':math.pi,'shots':data_para[3],'result':data_para[4]})
+        k.key='temp_para.json'
+        temp_para=json.loads(k.get_contents_as_string())
+        if(temp_para[6]==1):
+            k.key='cluster_id'
+            cluster_id=k.get_contents_as_string()
+            conn=EmrConnection(access_id,access_key)
+            if(temp_para[7]==0):
+                status=conn.describe_cluster(cluster_id)
+                if(status.status.state=='WAITING'):
+                    PYdata=get_output()
+                    conn.terminate_jobflow(cluster_id)
+                    data=in_circle_to_pi(PYdata,temp_para[0])
+                    k.key='temp_para.json'
+                    temp_para[6]=0
+                    k.set_contents_from_string(json.dumps(temp_para))
+                    data_para[0:4]=temp_para[0:4]
+                    data_para[4]=json.loads(data)[-1]
+                    note='last emr job done, reslut have been updated'
+                    save_result(json.dumps(data),json.dumps(data_para))
+
+                else:
+                    note='last emr calculation havet finished,please waitting.'
+                    k.key='record.json'
+                    data=k.get_contents_as_string()
+                    k.key='record_para.json'
+                    data_para_json=k.get_contents_as_string()
+                    data_para=json.loads(data_para_json)
+            elif(temp_para[7]==1):
+                status=conn.describe_cluster(cluster_id)
+                if(status.status.state=='WAITING'):
+                    k.key='temp_data.json'
+                    PYdata=np.array(json.loads(k.get_contents_as_string()))
+                    PYdata+=get_output()
+                    if(round(np.sum(PYdata)/(temp_para[3]*temp_para[5]),temp_para[4])==round(math.pi,temp_para[4])):
+                        for i in range(1,len(PYdata)):
+			    PYdata[i]+=PYdata[i-1]
+			    PYdata[i-1]/=temp_para[0]*(i)*temp_para[5]
+			PYdata[len(PYdata)-1]/=temp_para[0]*len(PYdata)*temp_para[5]
+			data=json.dumps(PYdata.tolist())#covernt numpy array to list
+
+                        k.key='temp_para.json'
+                        temp_para[6]=0
+                        k.set_contents_from_string(json.dumps(temp_para))
+                        data_para[0:4]=temp_para[0:4]
+                        data_para[4]=json.loads(data)[-1]
+                        conn.terminate_jobflow(cluster_id)
+                        note='last emr job done,result have been updated'
+                        save_result(json.dumps(data),json.dumps(data_para))
+                    else:
+                        note=str(np.sum(PYdata))+','+str(temp_para[3])+','+str(temp_para[5])
+                        add_step_emr(conn,cluster_id)
+                        save_temp_result(PYdata)
+                        for key in bucket.list(prefix='output/'):
+                            key.delete()
+                        temp_para[5]+=1
+                        k.key='temp_para.json'
+                        k.set_contents_from_string(json.dumps(temp_para))
+                        #note='havet find the given accuracy in last run, keep working'
+                        k.key='record.json'
+                        data=k.get_contents_as_string()
+                        k.key='record_para.json'
+                        data_para_json=k.get_contents_as_string()
+                        data_para=json.loads(data_para_json)
+                else:
+                    note='last emr calculation havet finished,please waitting.'
+                    k.key='record.json'
+                    data=k.get_contents_as_string()
+                    k.key='record_para.json'
+                    data_para_json=k.get_contents_as_string()
+                    data_para=json.loads(data_para_json)
+        else:
+            k.key='record.json'
+            data=k.get_contents_as_string()
+            k.key='record_para.json'
+            data_para_json=k.get_contents_as_string()
+            data_para=json.loads(data_para_json)
+
+        doRender(self,'chart.htm',{'Data':data,'shots_each_threat':data_para[0],'R':data_para[1],'Q':data_para[2],'pi':math.pi,'shots':data_para[3],'result':data_para[4],'note':note})
 class CalculateHandler(webapp2.RequestHandler):
 	def post(self):
 		try:
@@ -152,40 +244,23 @@ class CalculateHandler(webapp2.RequestHandler):
                                 PYdata +=multithreading_lambda_call(shotsForEachThread,Q,R)
                                 if(round(np.sum(PYdata)/(shots*runtimes),accuracy)==round(math.pi,accuracy)):
                                     found=1
-                            #for i in range(1,len(PYdata)):
-			#	PYdata[i]+=PYdata[i-1]
-			#	PYdata[i-1]/=shotsForEachBlock*(i)*runtimes
-			 #   PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)*runtimes
-			  #  data=json.dumps(PYdata.tolist())#covernt numpy array to list
+                            for i in range(1,len(PYdata)):
+				PYdata[i]+=PYdata[i-1]
+				PYdata[i-1]/=shotsForEachBlock*(i)*runtimes
+			    PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)*runtimes
+			    data=json.dumps(PYdata.tolist())#covernt numpy array to list
+                            parameter='['+str(shotsForEachBlock)+','+str(R)+','+str(Q)+','+str(shots)+','+str(PYdata[len(PYdata)-1])+']'
+                            save_result(data,parameter)
+                            doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
+
                         elif server==1:#server=emr, mode =given accuracy
 
                             set_input_and_delete_output(Q,R,shotsForEachBlock)
                             cluster_id,conn=create_emr(R)
-                            #deRender(self,'index.htm',{'note':'emr cluster created successful, please waiting for the calculator'})
-                            while (found==0):
-                                runtimes+=1
-                                complete=0
-                                while(complete==0):
-                                    status=conn.describe_cluster(cluster_id)
-                                    if(status.status.state=='WAITING'):
-                                        complete=1
-                                        PYdata+=get_output()
-                                    if(status.status.state=='TERMINATED_WITH_ERRORS'):
-                                        complete=1
-                                        error=1
-                                    else:
-                                        time.sleep(30)
-                                if(round(np.sum(PYdata)/(shots*runtimes),accuracy)==round(math.pi,accuracy)):
-                                    found=1
-                                    conn.terminate_jobflow(cluster_id)
-
-                                else:
-                                    add_step_emr(conn,cluster_id)
-                        for i in range(1,len(PYdata)):
-			    PYdata[i]+=PYdata[i-1]
-			    PYdata[i-1]/=shotsForEachBlock*(i)*runtimes
-			PYdata[len(PYdata)-1]/=shotsForEachBlock*len(PYdata)*runtimes
-			data=json.dumps(PYdata.tolist())#covernt numpy array to list
+                            store_parameter(shotsForEachBlock,R,Q,shots,accuracy,1,1,1)
+                            save_cluster_id(cluster_id)
+                            save_temp_result(np.zeros(R*Q))
+                            doRender(self,'index.htm',{'note':'emr has create,pleast waiting for the result'})
 
                         
 		
@@ -193,30 +268,18 @@ class CalculateHandler(webapp2.RequestHandler):
                     if server==0:#server=lambda, mode=given number
 
 			PYdata =multithreading_lambda_call(shotsForEachThread,Q,R)
+                        parameter='['+str(shotsForEachBlock)+','+str(R)+','+str(Q)+','+str(shots)+','+str(PYdata[len(PYdata)-1])+']'
+                        save_result(data,parameter)
+                        doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
+
 			
                     elif server==1:#server=emr,mode=give number
                         set_input_and_delete_output(R,Q,shotsForEachBlock)
                         cluster_id,conn=create_emr(R)
-                        #doRender(self,'index.htm',{'note':'emr cluster created successful, please waiting for the calculator'})
-                        complete=0
-                        error=0
-                        while(complete==0):
-                            status=conn.describe_cluster(cluster_id)
-                            if( status.status.state=='WAITING' ):
-                                complete=1
-                                PYdata=get_output()
-                            if (status.status.state=='TERMINATED_WITH_ERRORS'):
-                                complete=1
-                                error=1
-                            else:
-                                time.sleep(30)
-                                #doRender(self,'index.htm',{'note':'still in process:'+status.status.state})
-                        conn.terminate_jobflow(cluster_id)
-                    data=in_circle_to_pi(PYdata,shotsForEachBlock)
+                        store_parameter(shotsForEachBlock,R,Q,shots,0,0,1,0)
+                        save_cluster_id(cluster_id)
+                        doRender(self,'index.htm',{'note':'emr has create, please waiting for the result'})
 
-                parameter='['+str(shotsForEachBlock)+','+str(R)+','+str(Q)+','+str(shots)+','+str(PYdata[len(PYdata)-1])+']'
-                save_result(data,parameter)
-                doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
 
 
 
