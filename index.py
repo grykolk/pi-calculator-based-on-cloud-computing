@@ -18,7 +18,16 @@ from boto.emr.instance_group import InstanceGroup
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_environment = jinja2.Environment( loader = jinja2.FileSystemLoader(template_dir), autoescape=True)
-
+access_id='AKIAVOXXDGSS73DRX2MP'
+access_key='1lohqpb+ll5MTyk8r1Xhyj269wwKOXFbhr00+wxW'
+conn=''
+cluster_id=''
+emr_jobflow_working=0
+emr_job_mode=0
+golbal_runtime=0
+golbal_PYdata=0
+golbal_accuracy=0
+golbal_shots=0
 def doRender(handler, tname, values={}):
 	temp = os.path.join(os.path.dirname(__file__), 'templates/'+tname)
 	if not os.path.isfile(temp):
@@ -156,7 +165,7 @@ class S3Handler(webapp2.RequestHandler):
                     data_para[0:4]=temp_para[0:4]
                     data_para[4]=json.loads(data)[-1]
                     note='last emr job done, reslut have been updated'
-                    save_result(json.dumps(data),json.dumps(data_para))
+                    save_result(data,json.dumps(data_para))
 
                 else:
                     note='last emr calculation havet finished,please waitting.'
@@ -185,7 +194,7 @@ class S3Handler(webapp2.RequestHandler):
                         data_para[4]=json.loads(data)[-1]
                         conn.terminate_jobflow(cluster_id)
                         note='last emr job done,result have been updated'
-                        save_result(json.dumps(data),json.dumps(data_para))
+                        save_result(data,json.dumps(data_para))
                     else:
                         note=str(np.sum(PYdata))+','+str(temp_para[3])+','+str(temp_para[5])
                         add_step_emr(conn,cluster_id)
@@ -268,6 +277,7 @@ class CalculateHandler(webapp2.RequestHandler):
                     if server==0:#server=lambda, mode=given number
 
 			PYdata =multithreading_lambda_call(shotsForEachThread,Q,R)
+                        data=in_circle_to_pi(PYdata,shotsForEachBlock)
                         parameter='['+str(shotsForEachBlock)+','+str(R)+','+str(Q)+','+str(shots)+','+str(PYdata[len(PYdata)-1])+']'
                         save_result(data,parameter)
                         doRender(self,'chart.htm',{'Data':data,'shots_each_threat':shotsForEachBlock,'R':R,'Q':Q,'pi':math.pi,'shots':shots,'result':PYdata[len(PYdata)-1]})
